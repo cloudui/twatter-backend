@@ -1,20 +1,29 @@
-from re import L
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import desc
 from flask_cors import CORS
+from flask_migrate import Migrate
+
+from datetime import datetime
+
+from timeformat import utc_timestamp
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 CORS(app)
-# Configuring Database
 
+
+# Configuring Database
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(15), unique=True, nullable=False)
     email = db.Column(db.String(64))
     pwd = db.Column(db.String(64))
+
 
     def __init__(self, username, email, pwd):
         self.username = username
@@ -26,6 +35,7 @@ class Tweet(db.Model):
     uid = db.Column(db.Integer, db.ForeignKey("user.id"))
     user = db.relationship('User', foreign_keys=uid)
     text = db.Column(db.String(280))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # Methods for Users
@@ -94,10 +104,11 @@ def add_user():
 # Methods for Tweets
 
 def getTweets():
-    tweets = Tweet.query.all()
+    tweets = Tweet.query.order_by(desc('created_at'))
     return [{
         "id": i.id,
         "text": i.text,
+        "created_at": utc_timestamp(i.created_at),
         "user": getUser(i.uid)
         }
         for i in tweets
@@ -107,6 +118,7 @@ def getUserTweets(uid):
     return [{
         "id": i.id,
         "text": i.text,
+        "created_at": i.created_at,
         "userid": uid
         }
         for i in tweets
